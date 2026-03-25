@@ -11,7 +11,7 @@ const FEATURES = [
   {
     tag: "SEMANTIC ENGINE",
     title: "Beyond keywords",
-    body: "Embeddings trained on 10M+ investment decisions map your thesis to opportunity — not by what you say, but what you mean.",
+    body: "Embeddings trained on 10M+ investment decisions map your thesis to opportunity, not by what you say, but what you mean.",
     metric: "94.7% precision",
   },
   {
@@ -23,7 +23,7 @@ const FEATURES = [
   {
     tag: "LIVE INTELLIGENCE",
     title: "Market-aware",
-    body: "Real-time ingestion of funding news, sector shifts, and macro signals keeps your pipeline current — not quarterly.",
+    body: "Real-time ingestion of funding news, sector shifts, and macro signals keeps your pipeline current,com not quarterly.",
     metric: "Live data",
   },
 ];
@@ -292,7 +292,7 @@ export default function LandingPage({ onNavigate }: { onNavigate?: (screen: stri
             marginBottom: "52px",
             fontWeight: 400,
           }}>
-            AI-powered semantic matching between founders and investors. Not keywords — intelligence. Every match explained, every connection meaningful.
+            AI-powered semantic matching between founders and investors. Not keywords but intelligence. Every match explained, every connection meaningful.
           </p>
 
           <div style={{ display: "flex", gap: "14px", alignItems: "center" }}>
@@ -476,7 +476,7 @@ export default function LandingPage({ onNavigate }: { onNavigate?: (screen: stri
             color: "rgba(196,199,242,0.4)", fontSize: "15px",
             maxWidth: "400px", margin: "0 auto 44px", lineHeight: 1.75,
           }}>
-            Whether you're raising your Series A or deploying your next fund — your match is already in the system.
+            Whether you're raising your Series A or deploying your next fund, your match is already in the system.
           </p>
           <div style={{ display: "flex", gap: "14px", justifyContent: "center" }}>
             <button
