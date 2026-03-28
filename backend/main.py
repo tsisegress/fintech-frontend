@@ -1,0 +1,309 @@
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from openai import OpenAI
+from dotenv import load_dotenv
+import PyPDF2
+import io
+import os
+import json
+import uuid
+
+load_dotenv()
+
+app = FastAPI(title="VentureLink Prototype")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# ── In-memory storage (resets on restart, fine for prototype) ──
+startups = {}    # startup_id → dict
+investors = {}   # investor_id → dict
+
+
+# ── Helper: extract PDF text ──
+def extract_pdf_text(pdf_bytes: bytes) -> str:
+    reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text() or ""
+    return text
+
+
+# ── Helper: call GPT ──
+def ask_gpt(system: str, user: str) -> str:
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        temperature=0.3,
+    )
+    return response.choices[0].message.content.strip()
+
+
+# ═══════════════════════════════════════════
+# STARTUP ENDPOINTS
+# ═══════════════════════════════════════════
+
+@app.post("/startup/upload-deck")
+async def upload_deck(file: UploadFile = File(...)):
+    """Upload a pitch deck PDF — extracts structured profile using GPT."""
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(400, "Only PDF files accepted")
+
+    pdf_bytes = await file.read()
+    raw_text = extract_pdf_text(pdf_bytes)
+
+    if not raw_text.strip():
+        raise HTTPException(422, "Could not extract text from PDF")
+
+    system = """You are a startup analyst. Read this pitch deck and return ONLY a JSON object with these fields:
+{
+  "company_name": "string",
+  "one_liner": "string",
+  "sector": "string (e.g. FinTech, HealthTech, SaaS, ClimaTech)",
+  "stage": "string (pre_seed / seed / series_a / series_b)",
+  "ask_usd": number or null,
+  "mrr_usd": number or null,
+  "description": "2-3 sentence summary"
+}
+Return ONLY the JSON. No markdown, no explanation."""
+
+    raw = ask_gpt(system, raw_text[:8000])
+
+    try:
+        # strip markdown fences if GPT adds them
+        cleaned = raw.strip().strip("```json").strip("```").strip()
+        profile = json.loads(cleaned)
+    except Exception:
+        raise HTTPException(422, f"GPT returned invalid JSON: {raw[:200]}")
+
+    startup_id = str(uuid.uuid4())
+    profile["id"] = startup_id
+    startups[startup_id] = profile
+
+    return {"startup_id": startup_id, **profile}
+
+
+@app.get("/startup/{startup_id}")
+def get_startup(startup_id: str):
+    s = startups.get(startup_id)
+    if not s:
+        raise HTTPException(404, "Startup not found")
+    return s
+
+
+@app.get("/startup/{startup_id}/matches")
+def get_matches(startup_id: str):
+    """Score this startup against all registered investors."""
+    startup = startups.get(startup_id)
+    if not startup:
+        raise HTTPException(404, "Startup not found")
+
+    if not investors:
+        return {"startup_id": startup_id, "matches": [], "message": "No investors registered yet"}
+
+    results = []
+    for inv_id, investor in investors.items():
+        system = """You are a venture capital matching engine. Given a startup and an investor thesis,
+return ONLY a JSON object:
+{
+  "score": 0.0 to 1.0,
+  "reasoning": "2-3 sentence explanation"
+}
+Score rubric:
+1.0 = perfect fit (sector, stage, and size all match)
+0.7 = good fit (2 of 3 match)
+0.5 = partial fit
+0.3 = weak fit
+0.0 = no fit
+Return ONLY the JSON."""
+
+        user = f"""STARTUP:
+Name: {startup.get('company_name')}
+Sector: {startup.get('sector')}
+Stage: {startup.get('stage')}
+Ask: ${startup.get('ask_usd') or 'unknown'}
+Description: {startup.get('description')}
+
+INVESTOR THESIS:
+Name: {investor.get('partner_name')}
+Firm: {investor.get('firm_name', '')}
+Thesis: {investor.get('thesis')}
+Preferred sectors: {investor.get('sectors', 'any')}
+Preferred stages: {investor.get('stages', 'any')}"""
+
+        try:
+            raw = ask_gpt(system, user)
+            cleaned = raw.strip().strip("```json").strip("```").strip()
+            result = json.loads(cleaned)
+            results.append({
+                "investor_id": inv_id,
+                "investor_name": investor.get("partner_name"),
+                "firm": investor.get("firm_name", ""),
+                "score": result.get("score", 0),
+                "reasoning": result.get("reasoning", ""),
+            })
+        except Exception as e:
+            results.append({
+                "investor_id": inv_id,
+                "investor_name": investor.get("partner_name"),
+                "score": 0,
+                "reasoning": f"Scoring failed: {e}",
+            })
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return {"startup_id": startup_id, "matches": results}
+
+
+# ═══════════════════════════════════════════
+# INVESTOR ENDPOINTS
+# ═══════════════════════════════════════════
+
+class InvestorRequest(BaseModel):
+    partner_name: str
+    firm_name: str = ""
+    thesis: str
+    sectors: str = "any"
+    stages: str = "any"
+
+
+@app.post("/investor/register")
+def register_investor(body: InvestorRequest):
+    """Register an investor with their thesis."""
+    investor_id = str(uuid.uuid4())
+    investor = {
+        "id": investor_id,
+        "partner_name": body.partner_name,
+        "firm_name": body.firm_name,
+        "thesis": body.thesis,
+        "sectors": body.sectors,
+        "stages": body.stages,
+    }
+    investors[investor_id] = investor
+    return {"investor_id": investor_id, **investor}
+
+
+@app.get("/investor/{investor_id}")
+def get_investor(investor_id: str):
+    inv = investors.get(investor_id)
+    if not inv:
+        raise HTTPException(404, "Investor not found")
+    return inv
+
+
+@app.get("/investor/{investor_id}/dealflow")
+def get_dealflow(investor_id: str):
+    """Return all startups ranked for this investor."""
+    investor = investors.get(investor_id)
+    if not investor:
+        raise HTTPException(404, "Investor not found")
+
+    if not startups:
+        return {"investor_id": investor_id, "deals": [], "message": "No startups uploaded yet"}
+
+    results = []
+    for s_id, startup in startups.items():
+        system = """You are a VC deal flow assistant. Return ONLY a JSON object:
+{
+  "score": 0.0 to 1.0,
+  "summary": "one line: [Stage] [Sector] company — key hook",
+  "reasoning": "2-3 sentences"
+}
+Return ONLY the JSON."""
+
+        user = f"""INVESTOR:
+{investor.get('partner_name')} at {investor.get('firm_name')}
+Thesis: {investor.get('thesis')}
+Sectors: {investor.get('sectors')}
+Stages: {investor.get('stages')}
+
+STARTUP:
+{startup.get('company_name')} — {startup.get('sector')} — {startup.get('stage')}
+{startup.get('description')}
+Ask: ${startup.get('ask_usd') or 'unknown'}
+MRR: ${startup.get('mrr_usd') or 'pre-revenue'}"""
+
+        try:
+            raw = ask_gpt(system, user)
+            cleaned = raw.strip().strip("```json").strip("```").strip()
+            result = json.loads(cleaned)
+            results.append({
+                "startup_id": s_id,
+                "company_name": startup.get("company_name"),
+                "sector": startup.get("sector"),
+                "stage": startup.get("stage"),
+                "score": result.get("score", 0),
+                "summary": result.get("summary", ""),
+                "reasoning": result.get("reasoning", ""),
+            })
+        except Exception as e:
+            results.append({
+                "startup_id": s_id,
+                "company_name": startup.get("company_name"),
+                "score": 0,
+                "summary": "Scoring failed",
+                "reasoning": str(e),
+            })
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return {"investor_id": investor_id, "deals": results}
+
+
+# ═══════════════════════════════════════════
+# MATCHING & INTRO
+# ═══════════════════════════════════════════
+
+@app.get("/intro/{startup_id}/{investor_id}")
+def get_intro(startup_id: str, investor_id: str):
+    """Draft a warm intro email between a startup and investor."""
+    startup = startups.get(startup_id)
+    investor = investors.get(investor_id)
+
+    if not startup:
+        raise HTTPException(404, "Startup not found")
+    if not investor:
+        raise HTTPException(404, "Investor not found")
+
+    system = "You are a warm intro writer for a VC platform. Write a professional, concise intro email."
+    user = f"""Write a warm intro email between:
+
+STARTUP: {startup.get('company_name')}
+{startup.get('description')}
+Sector: {startup.get('sector')}, Stage: {startup.get('stage')}, Ask: ${startup.get('ask_usd') or 'TBD'}
+
+INVESTOR: {investor.get('partner_name')} at {investor.get('firm_name')}
+Thesis: {investor.get('thesis')}
+
+Keep it under 150 words. Include subject line."""
+
+    email = ask_gpt(system, user)
+    return {"startup_id": startup_id, "investor_id": investor_id, "intro_email": email}
+
+
+# ═══════════════════════════════════════════
+# UTILITY
+# ═══════════════════════════════════════════
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "startups_count": len(startups),
+        "investors_count": len(investors),
+    }
+
+@app.get("/all")
+def get_all():
+    """See everything in memory — useful for debugging."""
+    return {"startups": startups, "investors": investors}
+
+
