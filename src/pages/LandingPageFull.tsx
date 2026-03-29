@@ -261,15 +261,25 @@ export default function LandingPage({ onNavigate }: { onNavigate?: (screen: stri
 
           <h1 style={{
             fontFamily: "'Marcellus', serif",
-            fontSize: "clamp(54px, 6vw, 88px)",
-            lineHeight: "1.08",
+            fontSize: "clamp(56px, 8vw, 108px)",
+            lineHeight: "1.0",
+            color: "#c4c7f2",
+            marginBottom: "10px",
+            fontWeight: 400,
+          }}>
+            Data becomes
+          </h1>
+          <h1 style={{
+            fontFamily: "'Marcellus', serif",
+            fontSize: "clamp(56px, 8vw, 108px)",
+            lineHeight: "1.0",
             marginBottom: "36px",
             fontWeight: 400,
             background: "linear-gradient(90deg, #1e97f2, #091eca)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
           }}>
-            An AI to help you find your perfect match investor/founder
+            decisions.
           </h1>
 
           <p style={{
@@ -302,7 +312,7 @@ export default function LandingPage({ onNavigate }: { onNavigate?: (screen: stri
               onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = "#1e97f2"; (e.target as HTMLButtonElement).style.transform = "translateY(-2px)"; }}
               onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = "#091eca"; (e.target as HTMLButtonElement).style.transform = "translateY(0)"; }}
             >
-              Start demo
+              Launch intelligence →
             </button>
             <button
               onClick={() => onNavigate?.("dashboard")}
@@ -321,7 +331,7 @@ export default function LandingPage({ onNavigate }: { onNavigate?: (screen: stri
               onMouseEnter={e => { (e.target as HTMLButtonElement).style.borderColor = "#1e97f2"; (e.target as HTMLButtonElement).style.color = "#c4c7f2"; }}
               onMouseLeave={e => { (e.target as HTMLButtonElement).style.borderColor = "rgba(9,65,202,0.3)"; (e.target as HTMLButtonElement).style.color = "rgba(196,199,242,0.5)"; }}
             >
-              Open dashboard
+              View case fit
             </button>
           </div>
         </div>

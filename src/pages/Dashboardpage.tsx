@@ -189,6 +189,22 @@ export default function DashboardPage({ onNavigate, userData }: { onNavigate?: (
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <button
+            onClick={() => onNavigate?.("logout")}
+            style={{
+              background: "transparent",
+              border: "1px solid rgba(196,199,242,0.2)",
+              color: "rgba(196,199,242,0.65)",
+              borderRadius: "6px",
+              fontSize: "11px",
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              padding: "7px 10px",
+              cursor: "pointer",
+            }}
+          >
+            Logout
+          </button>
           <div style={{
             position: "relative", cursor: "pointer",
             width: "32px", height: "32px",

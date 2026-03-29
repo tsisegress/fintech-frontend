@@ -28,15 +28,46 @@ interface UserData {
 }
 
 export default function App() {
-  const [page, setPage] = useState<Page>("landing");
-  const [userData, setUserData] = useState<UserData>({});
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const initialAuth = (() => {
+    try {
+      return localStorage.getItem("ff_auth") === "1";
+    } catch {
+      return false;
+    }
+  })();
+
+  const initialUser = (() => {
+    try {
+      const raw = localStorage.getItem("ff_user");
+      return raw ? (JSON.parse(raw) as UserData) : {};
+    } catch {
+      return {};
+    }
+  })();
+
+  const initialPage: Page = initialAuth
+    ? initialUser.role === "investor"
+      ? "investorDashboard"
+      : "dashboard"
+    : "auth";
+
+  const [page, setPage] = useState<Page>(initialPage);
+  const [userData, setUserData] = useState<UserData>(initialUser);
+  const [isAuthenticated, setIsAuthenticated] = useState(initialAuth);
 
   const handleNavigate = (target: string, data?: UserData) => {
+    if (target === "logout") {
+      setIsAuthenticated(false);
+      setUserData({});
+      setPage("auth");
+      localStorage.removeItem("ff_auth");
+      localStorage.removeItem("ff_user");
+      return;
+    }
+
     if (data) setUserData(prev => ({ ...prev, ...data }));
 
-    const guestAllowed = target === "landing" || target === "discover";
-    if (!isAuthenticated && target !== "auth" && !guestAllowed) {
+    if (!isAuthenticated && target !== "auth") {
       setPage("auth");
       return;
     }
@@ -51,13 +82,17 @@ export default function App() {
   };
 
   const handleAuthSuccess = (authData: { role: Role; name: string; email: string }) => {
-    setIsAuthenticated(true);
-    setUserData(prev => ({
-      ...prev,
+    const nextUserData = {
+      ...userData,
       role: authData.role,
       name: authData.name,
       email: authData.email,
-    }));
+    };
+
+    setIsAuthenticated(true);
+    setUserData(nextUserData);
+    localStorage.setItem("ff_auth", "1");
+    localStorage.setItem("ff_user", JSON.stringify(nextUserData));
     setPage("onboarding");
   };
 
