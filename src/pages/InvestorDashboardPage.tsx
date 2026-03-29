@@ -19,6 +19,7 @@ export default function InvestorDashboardPage({ onNavigate, userData }: { onNavi
         <div style={{ display: "flex", gap: "10px" }}>
           <button onClick={() => onNavigate?.("discover")} style={buttonGhost}>Discover</button>
           <button onClick={() => onNavigate?.("landing")} style={buttonPrimary}>Home</button>
+          <button onClick={() => onNavigate?.("logout")} style={buttonGhost}>Logout</button>
         </div>
       </div>
 
