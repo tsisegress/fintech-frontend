@@ -30,6 +30,15 @@ npm run dev
 
 Open Vite local URL (typically `http://localhost:5173`).
 
+### Auth flow notes
+
+- Frontend auth is currently local/demo mode (no backend auth API).
+- Use any non-empty `name`, `email`, and `password` to continue.
+- Role selected on sign-in decides dashboard route:
+  - `startup` → startup dashboard
+  - `investor` → investor dashboard
+- Session is persisted in localStorage; use the `Logout` button to clear it.
+
 ## Auth + role dashboards (frontend)
 
 - Users first land on a simple auth screen and choose role (`startup` or `investor`).
