@@ -175,6 +175,10 @@ class InvestorRequest(BaseModel):
     sectors: str = "any"
     stages: str = "any"
 
+class MarketChatRequest(BaseModel):
+    question: str
+    portfolio: list[str] | None = None
+
 
 @app.post("/investor/register")
 def register_investor(body: InvestorRequest):
@@ -306,4 +310,98 @@ def get_all():
     """See everything in memory — useful for debugging."""
     return {"startups": startups, "investors": investors}
 
+
+# ═══════════════════════════════════════════
+# CASE 6: AI FOR THE INDIAN INVESTOR
+# ═══════════════════════════════════════════
+
+@app.get("/india-investor/opportunity-radar")
+def get_opportunity_radar():
+    """
+    Signal-first feed inspired by the competition case:
+    scan filings/flows/events and surface actionable opportunities.
+    """
+    return {
+        "as_of": "2026-03-29",
+        "signals": [
+            {
+                "id": "sig-001",
+                "symbol": "HDFCBANK",
+                "signal_type": "bulk_block_activity",
+                "headline": "Large block deal absorbed with low post-trade volatility",
+                "explanation": "Stable price action after heavy block volume can indicate institutional confidence.",
+                "confidence": 0.84,
+            },
+            {
+                "id": "sig-002",
+                "symbol": "TATAMOTORS",
+                "signal_type": "management_commentary_shift",
+                "headline": "Commentary tone shifted toward margin resilience in recent remarks",
+                "explanation": "Positive margin language after cost pressure often precedes estimate revisions.",
+                "confidence": 0.79,
+            },
+            {
+                "id": "sig-003",
+                "symbol": "INFY",
+                "signal_type": "regulatory_and_sector_change",
+                "headline": "Sector peers guide lower while company guidance remains intact",
+                "explanation": "Relative guidance stability can become an alpha signal versus peers.",
+                "confidence": 0.76,
+            },
+        ],
+    }
+
+
+@app.get("/india-investor/chart-patterns/{symbol}")
+def get_chart_pattern_intelligence(symbol: str):
+    """Prototype response for chart-pattern intelligence with plain-English explanation."""
+    normalized = symbol.upper()
+    return {
+        "symbol": normalized,
+        "detected_patterns": [
+            {
+                "name": "ascending_triangle",
+                "timeframe": "daily",
+                "status": "forming",
+                "historical_win_rate": 0.62,
+                "explanation": "Higher lows against flat resistance suggest gradual accumulation by buyers.",
+            },
+            {
+                "name": "bullish_divergence_rsi",
+                "timeframe": "4h",
+                "status": "early_signal",
+                "historical_win_rate": 0.58,
+                "explanation": "Momentum improved while price remained range-bound, often preceding a directional move.",
+            },
+        ],
+        "risk_note": "Pattern probabilities are statistical, not guarantees. Combine with risk management.",
+    }
+
+
+@app.post("/india-investor/market-chat")
+def get_market_chat_response(body: MarketChatRequest):
+    """
+    Portfolio-aware response shape for a Market Chat assistant.
+    Uses deterministic stub logic now; can be replaced by RAG + tool calls.
+    """
+    portfolio = body.portfolio or []
+    answer = (
+        f"Question received: {body.question}. "
+        "Current prototype recommends checking trend + earnings + flow alignment before acting."
+    )
+    if portfolio:
+        answer += f" Portfolio context considered: {', '.join(portfolio[:5])}."
+
+    return {
+        "answer": answer,
+        "sources": [
+            {"type": "exchange", "label": "NSE Bhavcopy (simulated)"},
+            {"type": "filing", "label": "Corporate filing feed (simulated)"},
+            {"type": "news", "label": "Market news stream (simulated)"},
+        ],
+        "follow_up": [
+            "Do you want a bullish/bearish scenario tree?",
+            "Should I rank top 3 opportunities by risk-adjusted confidence?",
+        ],
+    }
 
